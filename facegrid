@@ -1,0 +1,33 @@
+#!/usr/bin/env perl
+use Mojolicious::Lite;
+
+plugin 'Config';
+
+get '/videocall/#name/#email' => sub {
+  my $c = shift;
+  my $me = {
+    name => 'Scott Travis',
+    email => 'stravis@keystone-technologies.com',
+    room => 'scotttravis',
+  };
+  my $name = $c->param('name');
+  my $email = $c->param('email');
+  my $sendgrid_api = $c->config('sendgrid')->{api};
+  my $sendgrid = {
+    to => $email,
+    toname => $name,
+    from => "$me->{email}",
+    fromname => "$me->{name}",
+    subject => "Incoming Video Call from $me->{name}",
+    html => "Hello, $name!  $me->{name} is wanting to talk with you.  <a href='http://appear.in/$me->{room}'>Click here to connect.</a>",
+  };
+  $c->app->log->info($c->dumper(["https://api.sendgrid.com/api/mail.send.json" => {Authorization => "Bearer $sendgrid_api"} => form => $sendgrid]));
+  $c->render_later;
+  $c->ua->post("https://api.sendgrid.com/api/mail.send.json" => {Authorization => "Bearer $sendgrid_api"} => form => $sendgrid => sub {
+    my ($ua, $tx) = @_;
+    say $tx->res->body;
+    $c->render(json => $tx->res->json);
+  });
+};
+
+app->start;
